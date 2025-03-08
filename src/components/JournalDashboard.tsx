@@ -228,7 +228,7 @@ const JournalDashboard = ({ entries, selectedMonth }: JournalDashboardProps) => 
     setCommonStrategies(countOccurrences(filteredEntries, 'strategies') as {strategy: string, count: number}[]);
   };
   
-  const renderBarGraph = (items: {[key: string]: string, count: number}[], label: string, colorClass: string) => {
+  const renderBarGraph = (items: Array<{[key: string]: string | number}>, label: string, colorClass: string) => {
     if (items.length === 0) {
       return (
         <div className="text-center py-4 text-slate-500">
@@ -238,17 +238,17 @@ const JournalDashboard = ({ entries, selectedMonth }: JournalDashboardProps) => 
     }
     
     // Find max count for scaling
-    const maxCount = Math.max(...items.map(item => item.count));
+    const maxCount = Math.max(...items.map(item => item.count as number));
     
     return (
       <div className="space-y-2">
         {items.map((item, index) => (
           <div key={index} className="flex items-center">
-            <div className="w-1/3 text-sm truncate pr-2">{item[label]}</div>
+            <div className="w-1/3 text-sm truncate pr-2">{item[label] as string}</div>
             <div className="w-2/3 flex items-center">
               <div 
                 className={`h-6 ${colorClass} rounded-md`} 
-                style={{ width: `${(item.count / maxCount) * 100}%` }}
+                style={{ width: `${(item.count as number / maxCount) * 100}%` }}
               ></div>
               <span className="ml-2 text-xs text-slate-600">{item.count}</span>
             </div>

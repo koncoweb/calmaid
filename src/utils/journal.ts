@@ -8,8 +8,7 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
-  FirestoreError
+  orderBy
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
 import { JournalEntry } from '../types';

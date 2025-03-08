@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Layout from '../components/Layout';
-import { Check, CircleCheck, Circle } from 'lucide-react';
+import { Check, CircleCheck } from 'lucide-react';
 
 interface GroundingItem {
   id: number;

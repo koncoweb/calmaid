@@ -6,8 +6,6 @@ import {
   deleteUser as firebaseDeleteUser,
   updatePassword,
   updateEmail,
-  EmailAuthProvider,
-  reauthenticateWithCredential,
   sendPasswordResetEmail,
   getAuth
 } from 'firebase/auth';
@@ -195,22 +193,22 @@ export const addUser = async (userData: {
 };
 
 // Update user
-export const updateUser = async (id: string, userData: Partial<{ 
-  username: string; 
-  password: string;
-  email: string;
-}>): Promise<User | null> => {
+export const updateUser = async (userId: string, userData: { 
+  username?: string; 
+  password?: string;
+  email?: string;
+}): Promise<boolean> => {
   try {
-    const userDocRef = doc(db, USERS_COLLECTION, id);
-    const userDoc = await getDoc(userDocRef);
-    
+    const userDoc = await getDoc(doc(db, USERS_COLLECTION, userId));
     if (!userDoc.exists()) {
-      return null;
+      console.error('User document not found');
+      return false;
     }
-    
+
+    const updates: { [key: string]: any } = {};
     const currentUserData = userDoc.data() as User;
-    
-    // If changing username, check if the new username already exists
+
+    // Check username update
     if (userData.username && userData.username !== currentUserData.username) {
       const usersRef = collection(db, USERS_COLLECTION);
       const q = query(usersRef, where("username", "==", userData.username));
@@ -220,8 +218,7 @@ export const updateUser = async (id: string, userData: Partial<{
         throw new Error('Username already exists');
       }
       
-      // Update username in Firestore
-      await updateDoc(userDocRef, { username: userData.username });
+      updates.username = userData.username;
       
       // Update displayName in Firebase Auth if possible
       if (auth.currentUser) {
@@ -231,12 +228,11 @@ export const updateUser = async (id: string, userData: Partial<{
           });
         } catch (error) {
           console.error("Could not update displayName in Firebase Auth:", error);
-          // Continue anyway as Firestore update was successful
         }
       }
     }
-    
-    // Update email if provided
+
+    // Check email update
     if (userData.email && userData.email !== currentUserData.email) {
       const usersRef = collection(db, USERS_COLLECTION);
       const q = query(usersRef, where("email", "==", userData.email));
@@ -246,8 +242,7 @@ export const updateUser = async (id: string, userData: Partial<{
         throw new Error('Email already in use');
       }
       
-      // Update email in Firestore
-      await updateDoc(userDocRef, { email: userData.email });
+      updates.email = userData.email;
       
       // Update email in Firebase Auth if possible
       if (auth.currentUser) {
@@ -255,57 +250,45 @@ export const updateUser = async (id: string, userData: Partial<{
           await updateEmail(auth.currentUser, userData.email);
         } catch (error) {
           console.error("Could not update email in Firebase Auth:", error);
-          // Continue anyway as Firestore update was successful
         }
       }
     }
-    
+
     // Update password if provided
     if (userData.password) {
       if (userData.password.length < 6) {
         throw new Error('Password must be at least 6 characters');
       }
       
-      // For password updates, we'll use the administrative API if possible
-      const userToUpdate = doc(db, USERS_COLLECTION, id);
-      const userSnapshot = await getDoc(userToUpdate);
-      
-      if (userSnapshot.exists()) {
-        const userData = userSnapshot.data() as User;
-        if (userData.email) {
-          try {
-            // Get a fresh instance of the Auth - helps avoid issues with current user
-            const freshAuth = getAuth();
-            
-            // Check if this is the current user - if so we can update directly
-            if (freshAuth.currentUser && freshAuth.currentUser.uid === id) {
-              await updatePassword(freshAuth.currentUser, userData.password);
-            } else {
-              // Otherwise, we need to switch to account recovery or similar methods
-              // Here we can send a password reset email that admin can forward to user
-              await sendPasswordResetEmail(freshAuth, userData.email);
-            }
-          } catch (error) {
-            console.error("Error updating password:", error);
-            throw new Error('Could not update password');
-          }
+      if (auth.currentUser) {
+        try {
+          await updatePassword(auth.currentUser, userData.password);
+        } catch (error) {
+          console.error("Error updating password:", error);
+          throw new Error('Could not update password');
+        }
+      } else {
+        const freshAuth = getAuth();
+        if (currentUserData.email) {
+          await sendPasswordResetEmail(freshAuth, currentUserData.email);
         }
       }
     }
-    
-    // Get updated user data
-    const updatedUserDoc = await getDoc(userDocRef);
-    return { ...updatedUserDoc.data(), id: updatedUserDoc.id } as User;
-  } catch (error: any) {
-    console.error("Error updating user:", error);
-    throw error;
+
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(doc(db, USERS_COLLECTION, userId), updates);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating user:', error);
+    return false;
   }
 };
 
 // Delete user
 export const deleteUser = async (id: string): Promise<boolean> => {
   try {
-    // Delete from Firestore first
     const userDocRef = doc(db, USERS_COLLECTION, id);
     const userDoc = await getDoc(userDocRef);
     
@@ -313,26 +296,18 @@ export const deleteUser = async (id: string): Promise<boolean> => {
       return false;
     }
     
-    // Get user data for potential Firebase Auth deletion
-    const userData = userDoc.data() as User;
-    
     // Delete from Firestore
     await deleteDoc(userDocRef);
     
-    // Then try to delete from Firebase Auth - this is tricky and might require re-authentication
+    // Try to delete from Firebase Auth
     try {
-      // If it's the current user, delete directly
       if (auth.currentUser && auth.currentUser.uid === id) {
         await firebaseDeleteUser(auth.currentUser);
       } else {
-        // For deleting other users, we'd need admin SDK (Firebase Admin)
-        // This typically requires a backend server
-        // For now, we'll just delete from Firestore and consider it a success
         console.warn("Could not delete user from Firebase Auth - requires admin SDK or current user context");
       }
     } catch (error) {
       console.error("Error deleting user from Firebase Auth:", error);
-      // Continue anyway as Firestore delete was successful
     }
     
     return true;

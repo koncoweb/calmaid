@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { CircleAlert, BookOpen, Calendar, ChartBar, CirclePlus, ExternalLink, FileText, Loader, Pencil, RefreshCw, Trash2 } from 'lucide-react';
+import { CircleAlert, BookOpen, ChartBar, CirclePlus, ExternalLink, FileText, Loader, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { JournalEntry } from '../types';
 import { getJournalEntries, deleteJournalEntry } from '../utils/journal';
 import JournalDashboard from '../components/JournalDashboard';
@@ -218,120 +218,70 @@ const PanicJournal = () => {
   );
 
   return (
-    <Layout title="Panic Journaling" showBack backTo="/dashboard">
-      <div className="max-w-4xl mx-auto">
+    <Layout title="Jurnal Panik">
+      <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-xl font-semibold">Catatan Serangan Panik</h2>
-            <p className="text-slate-600">Lacak dan analisis serangan panik Anda</p>
-          </div>
-          <div className="flex gap-2">
+          <h1 className="text-2xl font-bold text-slate-800">Catatan Serangan Panik</h1>
+          <div className="flex gap-4">
             <button
               onClick={toggleView}
-              className={`flex items-center gap-1 px-3 py-2 rounded-lg ${
-                !showDashboard 
-                  ? 'bg-indigo-100 text-indigo-700'
-                  : 'bg-indigo-600 text-white'
-              }`}
-              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100"
             >
-              {showDashboard ? <FileText size={18} /> : <ChartBar size={18} />}
-              <span>{showDashboard ? 'Lihat Entri' : 'Dashboard'}</span>
+              {showDashboard ? <FileText size={16} /> : <ChartBar size={16} />}
+              <span>{showDashboard ? 'Lihat Catatan' : 'Lihat Statistik'}</span>
             </button>
             <button
               onClick={() => navigate('/journal/new')}
-              className="flex items-center gap-1 bg-teal-600 text-white px-3 py-2 rounded-lg hover:bg-teal-700"
-              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
             >
-              <CirclePlus size={18} />
+              <CirclePlus size={16} />
               <span>Tambah Catatan</span>
             </button>
           </div>
         </div>
 
-        {error && !indexError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-center">
-            <CircleAlert size={18} className="mr-2" />
-            <span>{error}</span>
-            <button 
-              onClick={() => setError("")} 
-              className="ml-auto text-red-700 hover:text-red-900"
-            >
-              <Trash2 size={16} />
-            </button>
+        {loading ? (
+          renderLoadingState()
+        ) : error ? (
+          renderErrorState()
+        ) : entries.length === 0 ? (
+          renderEmptyState()
+        ) : showDashboard ? (
+          <JournalDashboard entries={entries} selectedMonth={selectedMonth} />
+        ) : (
+          <div>
+            <div className="mb-6">
+              <select
+                value={selectedMonth}
+                onChange={(e) => filterEntriesByMonth(e.target.value)}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-sm"
+              >
+                {getAvailableMonths().map(month => (
+                  <option key={month} value={month}>
+                    {formatMonthLabel(month)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {renderEntries()}
           </div>
         )}
 
         {indexError && (
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg mb-4">
-            <div className="flex items-center mb-2">
-              <CircleAlert size={18} className="mr-2 flex-shrink-0" />
-              <span className="font-medium">{error}</span>
-            </div>
-            <p className="text-sm ml-6 mb-2">
-              Anda perlu membuat indeks di Firebase Console untuk mengurutkan entri jurnal. Anda masih bisa menggunakan
-              aplikasi, tetapi pengurutan optimal memerlukan indeks yang dibuat.
+          <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
+            <p className="text-yellow-800 mb-2">
+              Untuk mengurutkan entri jurnal perlu membuat indeks di Firebase Console.
             </p>
-            <div className="ml-6 text-sm">
-              <a 
-                href={indexError} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center text-amber-900 hover:text-amber-700 font-medium"
-              >
-                <span>Buka Firebase Console untuk membuat indeks</span>
-                <ExternalLink size={14} className="ml-1" />
-              </a>
-            </div>
+            <a
+              href={indexError}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-yellow-800 hover:text-yellow-900 underline"
+            >
+              <span>Buat Indeks</span>
+              <ExternalLink size={14} />
+            </a>
           </div>
-        )}
-
-        {showDashboard ? (
-          <div>
-            {loading ? (
-              renderLoadingState()
-            ) : (
-              <>
-                <JournalDashboard entries={entries} selectedMonth={selectedMonth} />
-                
-                <div className="mt-6 bg-white rounded-lg shadow p-4">
-                  <div className="flex items-center mb-4">
-                    <Calendar size={18} className="text-indigo-600 mr-2" />
-                    <h3 className="font-medium">Filter Berdasarkan Bulan</h3>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {getAvailableMonths().length > 0 ? (
-                      getAvailableMonths().map(month => (
-                        <button
-                          key={month}
-                          onClick={() => filterEntriesByMonth(month)}
-                          className={`px-3 py-1 rounded-lg text-sm ${
-                            selectedMonth === month 
-                              ? 'bg-indigo-600 text-white' 
-                              : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-                          }`}
-                        >
-                          {formatMonthLabel(month)}
-                        </button>
-                      ))
-                    ) : (
-                      <p className="text-slate-500 text-sm">Tidak ada data untuk difilter</p>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
-          <>
-            {loading ? (
-              renderLoadingState()
-            ) : entries.length === 0 ? (
-              renderEmptyState()
-            ) : (
-              renderEntries()
-            )}
-          </>
         )}
       </div>
     </Layout>
